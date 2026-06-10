@@ -1,0 +1,7 @@
+instructions.pdf
+example_change_detection.py
+.venv
+debug_notebook.ipynb
+.ipynb_checkpoints
+data/**/*.xml
+data/processed/*

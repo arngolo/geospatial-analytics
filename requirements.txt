@@ -1,0 +1,9 @@
+#WINDOWS 10 REQUIREMENTS
+# check installed python versions (where/which python)
+# create a python 10 venv: C:\Python310\python.exe -m venv .venv
+
+numpy
+matplotlib
+rasterio
+jupyter
+natsort
