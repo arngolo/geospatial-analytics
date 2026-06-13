@@ -244,3 +244,7 @@ def stack_to_geotiff(stack, geoinfo, output_path):
         geotiff = rasterio.open(output_path, "w", driver = "GTiff", height = stack.shape[1], width = stack.shape[2], dtype = stack.dtype, count = stack.shape[0], nodata = geoinfo['nodata'], crs = geoinfo['crs'], transform = geoinfo['transform'])
         geotiff.write(stack)
     geotiff.close()
+
+def histogram_match(image_source, image_reference):
+
+    return match_histograms(image_source, image_reference, channel_axis=-1)

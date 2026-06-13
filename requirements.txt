@@ -8,3 +8,4 @@ rasterio
 jupyter
 natsort
 pyproj
+scikit-image
