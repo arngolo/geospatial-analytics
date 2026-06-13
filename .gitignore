@@ -1,7 +1,7 @@
 instructions.pdf
 example_change_detection.py
 .venv
-debug_notebook.ipynb
+__pycache__
 .ipynb_checkpoints
 data/**/*.xml
 data/processed/*

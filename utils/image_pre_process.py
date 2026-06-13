@@ -7,8 +7,12 @@ import json
 from natsort import natsorted
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+from matplotlib.patches import Polygon
 import random
 import matplotlib.colors as mcolors
+from pyproj import Transformer
+from rasterio.transform import rowcol
+from skimage.exposure import match_histograms
 
 
 def Normalizer(feature):
@@ -20,27 +24,165 @@ def Normalizer(feature):
         feature=np.divide((feature-feature_min),(feature_max-feature_min))
     return feature
 
+import json
+
 def aoi_geojson_reader(annotation_path):
+    """
+    Read AOI GeoJSON file.
 
-    annotation_dictionary = {}
-    # annotation for each image
-    annotations = open(annotation_path,'rb')
-    annotations = json.load(annotations)
-    annotations = annotations['images']
-    annotation_dictionary['images'] = {item['file_name']: item for item in annotations}
+    Parameters
+    ----------
+    annotation_path : str
 
-    #get unique classe labels from the created dictionary
-    classes = {}
-    counter = 1
-    for image in list(annotation_dictionary['images'].keys()):
-        for classe in annotation_dictionary['images'][image]['annotations']:
-            if not classes or classe['class'] not in classes.keys():
-                classes[classe['class']] = counter
-                counter += 1
-                
-    annotation_dictionary['class_labels'] = classes
-                
-    return annotation_dictionary
+    Returns
+    -------
+    dict
+        GeoJSON dictionary
+    """
+
+    with open(annotation_path, "r", encoding="utf-8") as f:
+        geojson_dict = json.load(f)
+
+    return geojson_dict
+
+def geojson_polygon_to_pixels(coords, raster_meta):
+    """
+    Convert a GeoJSON polygon from lon/lat coordinates
+    to raster pixel coordinates.
+
+    Parameters
+    ----------
+    coords : list
+        Polygon coordinates:
+        [[lon, lat], [lon, lat], ...]
+
+    raster_meta : dict
+        {
+            "crs": raster CRS,
+            "transform": raster affine transform
+        }
+
+    Returns
+    -------
+    np.ndarray
+        Shape (N, 2)
+        [[col, row], ...]
+    """
+
+    transformer = Transformer.from_crs(
+        "EPSG:4326",          # GeoJSON default CRS
+        raster_meta["crs"],  # Raster CRS
+        always_xy=True
+    )
+
+    vertices = []
+
+    for lon, lat in coords:
+
+        x, y = transformer.transform(lon, lat)
+
+        row, col = rowcol(
+            raster_meta["transform"],
+            x,
+            y
+        )
+
+        vertices.append([col, row])
+
+    return np.asarray(vertices, dtype=np.float32)
+
+def geojson_to_pixel_polygons(geojson_dict, raster_meta):
+
+    polygons = []
+
+    for feature in geojson_dict["features"]:
+
+        geometry = feature["geometry"]
+
+        if geometry["type"] != "Polygon":
+            continue
+
+        coords = geometry["coordinates"][0]
+
+        pixel_vertices = geojson_polygon_to_pixels(
+            coords,
+            raster_meta
+        )
+
+        polygons.append(pixel_vertices)
+
+    return polygons
+
+from matplotlib.patches import Polygon
+import numpy as np
+import matplotlib.pyplot as plt
+
+
+def visualize_image_with_polygons(image, pixel_polygons=None, title="Image", show_vertices=False):
+
+    # CHW -> HWC
+    if image.ndim == 3 and image.shape[0] in (1, 2, 3):
+        image = np.moveaxis(image, 0, -1)
+
+    fig, ax = plt.subplots(figsize=(10, 10))
+
+    if image.ndim == 2:
+
+        ax.imshow(image, cmap="gray")
+
+    elif image.ndim == 3:
+
+        if image.shape[-1] == 1:
+
+            ax.imshow(image[:, :, 0], cmap="gray")
+
+        elif image.shape[-1] == 2:
+
+            rgb = np.dstack([
+                image[:, :, 0],
+                image[:, :, 1],
+                np.zeros_like(image[:, :, 0])
+            ])
+
+            ax.imshow(rgb)
+
+        else:
+
+            rgb = image[:, :, :3].astype(np.float32)
+
+            if rgb.max() > 0:
+                rgb /= rgb.max()
+
+            ax.imshow(rgb)
+
+    # Draw polygons only if provided
+    if pixel_polygons is not None:
+
+        for vertices in pixel_polygons:
+
+            poly = Polygon(
+                vertices,
+                fill=False,
+                edgecolor="red",
+                linewidth=2
+            )
+
+            ax.add_patch(poly)
+
+            if show_vertices:
+
+                xs, ys = zip(*vertices)
+
+                ax.plot(
+                    xs,
+                    ys,
+                    "ro",
+                    markersize=3
+                )
+
+    ax.set_title(title)
+
+    plt.show()
 
 def normalized_difference(band_a, band_b, epslon=1e-8):
     result = (band_a - band_b) / (band_a + band_b + epslon)
@@ -94,10 +236,11 @@ def stack_bands(list_of_bands, bands):
     return stack, geoinfo
 
 def stack_to_geotiff(stack, geoinfo, output_path):
-    
-    stack = np.moveaxis(stack, -1, 0) # reshape to (channel, height, width)
-    geotiff = rasterio.open(output_path, "w", driver = "GTiff", height = stack.shape[1], width = stack.shape[2], dtype = stack.dtype, count = stack.shape[0], nodata = geoinfo['nodata'], crs = geoinfo['crs'], transform = geoinfo['transform'])
-    geotiff.write(stack)
+    if stack.ndim == 2:
+        geotiff = rasterio.open(output_path, "w", driver = "GTiff", height = stack.shape[0], width = stack.shape[1], dtype = stack.dtype, count = 1, nodata = geoinfo['nodata'], crs = geoinfo['crs'], transform = geoinfo['transform'])
+        geotiff.write(stack, 1)    
+    else:
+        stack = np.moveaxis(stack, -1, 0) # reshape to (channel, height, width)
+        geotiff = rasterio.open(output_path, "w", driver = "GTiff", height = stack.shape[1], width = stack.shape[2], dtype = stack.dtype, count = stack.shape[0], nodata = geoinfo['nodata'], crs = geoinfo['crs'], transform = geoinfo['transform'])
+        geotiff.write(stack)
     geotiff.close()
-
-
