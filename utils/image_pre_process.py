@@ -248,3 +248,65 @@ def stack_to_geotiff(stack, geoinfo, output_path):
 def histogram_match(image_source, image_reference):
 
     return match_histograms(image_source, image_reference, channel_axis=-1)
+
+def sam_change_detection(image_before, image_after):
+
+    """
+    Detect changes between two co-registered images using
+    Spectral Angle Mapper (SAM).
+
+    SAM measures the angle between the spectral vectors of the
+    same pixel observed at two different dates. Unlike Change
+    Vector Analysis (CVA), which measures the magnitude of the
+    spectral difference, SAM measures the change in spectral
+    direction and is therefore less sensitive to overall
+    brightness and radiometric differences between images.
+
+    Parameters
+    ----------
+    image_before : np.ndarray
+        Image at time T1.
+        Shape: (height, width, bands)
+
+    image_after : np.ndarray
+        Image at time T2.
+        Shape: (height, width, bands)
+
+    Returns
+    -------
+    change_uint8 : np.ndarray
+        Change map normalized to 0–255 (uint8).
+        Useful for visualization or saving as raster.
+
+    change_probability : np.ndarray
+        Change map normalized to 0–1 (float32).
+        Higher values indicate stronger spectral change.
+
+    Advantages:
+    - More robust to illumination differences
+    - More robust to radiometric inconsistencies
+    - Commonly used in remote sensing and hyperspectral analysis
+
+    Limitations:
+    - Uses only spectral direction and ignores change magnitude
+    - Can be sensitive when spectral vectors have very low values
+    """
+
+    image_before = image_before.astype(np.float32)
+    image_after = image_after.astype(np.float32)
+
+    dot_product = np.sum(image_before * image_after, axis=2)
+
+    norm_before = np.linalg.norm(image_before, axis=2)
+    norm_after = np.linalg.norm(image_after, axis=2)
+
+    cosine = dot_product / (norm_before * norm_after + 1e-8)
+    cosine = np.clip(cosine, -1, 1)
+
+    angle = np.arccos(cosine)
+
+    probability = (angle - angle.min()) / (angle.max() - angle.min() + 1e-8)
+
+    change_uint8 = (probability * 255).astype(np.uint8)
+
+    return change_uint8, probability
