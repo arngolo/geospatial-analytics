@@ -5,3 +5,5 @@ __pycache__
 .ipynb_checkpoints
 data/**/*.xml
 data/processed/*
+data/change_database.sqlite
+utils/__pycache__/*

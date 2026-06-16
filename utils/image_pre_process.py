@@ -13,6 +13,7 @@ import matplotlib.colors as mcolors
 from pyproj import Transformer
 from rasterio.transform import rowcol
 from skimage.exposure import match_histograms
+from skimage.filters import threshold_otsu
 
 
 def Normalizer(feature):
@@ -112,11 +113,6 @@ def geojson_to_pixel_polygons(geojson_dict, raster_meta):
         polygons.append(pixel_vertices)
 
     return polygons
-
-from matplotlib.patches import Polygon
-import numpy as np
-import matplotlib.pyplot as plt
-
 
 def visualize_image_with_polygons(image, pixel_polygons=None, title="Image", show_vertices=False):
 
@@ -310,3 +306,13 @@ def sam_change_detection(image_before, image_after):
     change_uint8 = (probability * 255).astype(np.uint8)
 
     return change_uint8, probability
+
+def threshold_change(change_map, percentile=95):
+    thresh = np.percentile(change_map, percentile)
+    binary = (change_map > thresh).astype(np.uint8)
+    return binary
+
+def otsu_threshold_change(change_map):
+    t = threshold_otsu(change_map)
+    binary = (change_map > t).astype(np.uint8)
+    return binary
