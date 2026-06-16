@@ -9,3 +9,4 @@ jupyter
 natsort
 pyproj
 scikit-image
+shapely

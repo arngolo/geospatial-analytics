@@ -13,6 +13,10 @@ import matplotlib.colors as mcolors
 from pyproj import Transformer
 from rasterio.transform import rowcol
 from skimage.exposure import match_histograms
+from skimage.filters import threshold_otsu
+from shapely.geometry import Polygon as sh_polygon
+from shapely.ops import unary_union
+from pyproj import Transformer
 
 
 def Normalizer(feature):
@@ -44,6 +48,20 @@ def aoi_geojson_reader(annotation_path):
         geojson_dict = json.load(f)
 
     return geojson_dict
+
+def clip_to_aoi(polygons, geojson_dict, srid=32735):
+
+    transformer = Transformer.from_crs("EPSG:4326", f"EPSG:{srid}", always_xy=True)
+
+    aoi = unary_union([
+        sh_polygon([transformer.transform(lon, lat) for lon, lat in feature["geometry"]["coordinates"][0]])
+        for feature in geojson_dict["features"]
+        if feature["geometry"]["type"] == "Polygon"
+    ])
+
+    clipped = [p.intersection(aoi) for p in polygons if p.intersects(aoi)]
+
+    return [p for p in clipped if not p.is_empty]
 
 def geojson_polygon_to_pixels(coords, raster_meta):
     """
@@ -112,11 +130,6 @@ def geojson_to_pixel_polygons(geojson_dict, raster_meta):
         polygons.append(pixel_vertices)
 
     return polygons
-
-from matplotlib.patches import Polygon
-import numpy as np
-import matplotlib.pyplot as plt
-
 
 def visualize_image_with_polygons(image, pixel_polygons=None, title="Image", show_vertices=False):
 
@@ -248,3 +261,75 @@ def stack_to_geotiff(stack, geoinfo, output_path):
 def histogram_match(image_source, image_reference):
 
     return match_histograms(image_source, image_reference, channel_axis=-1)
+
+def sam_change_detection(image_before, image_after):
+
+    """
+    Detect changes between two co-registered images using
+    Spectral Angle Mapper (SAM).
+
+    SAM measures the angle between the spectral vectors of the
+    same pixel observed at two different dates. Unlike Change
+    Vector Analysis (CVA), which measures the magnitude of the
+    spectral difference, SAM measures the change in spectral
+    direction and is therefore less sensitive to overall
+    brightness and radiometric differences between images.
+
+    Parameters
+    ----------
+    image_before : np.ndarray
+        Image at time T1.
+        Shape: (height, width, bands)
+
+    image_after : np.ndarray
+        Image at time T2.
+        Shape: (height, width, bands)
+
+    Returns
+    -------
+    change_uint8 : np.ndarray
+        Change map normalized to 0–255 (uint8).
+        Useful for visualization or saving as raster.
+
+    change_probability : np.ndarray
+        Change map normalized to 0–1 (float32).
+        Higher values indicate stronger spectral change.
+
+    Advantages:
+    - More robust to illumination differences
+    - More robust to radiometric inconsistencies
+    - Commonly used in remote sensing and hyperspectral analysis
+
+    Limitations:
+    - Uses only spectral direction and ignores change magnitude
+    - Can be sensitive when spectral vectors have very low values
+    """
+
+    image_before = image_before.astype(np.float32)
+    image_after = image_after.astype(np.float32)
+
+    dot_product = np.sum(image_before * image_after, axis=2)
+
+    norm_before = np.linalg.norm(image_before, axis=2)
+    norm_after = np.linalg.norm(image_after, axis=2)
+
+    cosine = dot_product / (norm_before * norm_after + 1e-8)
+    cosine = np.clip(cosine, -1, 1)
+
+    angle = np.arccos(cosine)
+
+    probability = (angle - angle.min()) / (angle.max() - angle.min() + 1e-8)
+
+    change_uint8 = (probability * 255).astype(np.uint8)
+
+    return change_uint8, probability
+
+def threshold_change(change_map, percentile=95):
+    thresh = np.percentile(change_map, percentile)
+    binary = (change_map > thresh).astype(np.uint8)
+    return binary
+
+def otsu_threshold_change(change_map):
+    t = threshold_otsu(change_map)
+    binary = (change_map > t).astype(np.uint8)
+    return binary
