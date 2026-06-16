@@ -14,6 +14,9 @@ from pyproj import Transformer
 from rasterio.transform import rowcol
 from skimage.exposure import match_histograms
 from skimage.filters import threshold_otsu
+from shapely.geometry import Polygon as sh_polygon
+from shapely.ops import unary_union
+from pyproj import Transformer
 
 
 def Normalizer(feature):
@@ -45,6 +48,20 @@ def aoi_geojson_reader(annotation_path):
         geojson_dict = json.load(f)
 
     return geojson_dict
+
+def clip_to_aoi(polygons, geojson_dict, srid=32735):
+
+    transformer = Transformer.from_crs("EPSG:4326", f"EPSG:{srid}", always_xy=True)
+
+    aoi = unary_union([
+        sh_polygon([transformer.transform(lon, lat) for lon, lat in feature["geometry"]["coordinates"][0]])
+        for feature in geojson_dict["features"]
+        if feature["geometry"]["type"] == "Polygon"
+    ])
+
+    clipped = [p.intersection(aoi) for p in polygons if p.intersects(aoi)]
+
+    return [p for p in clipped if not p.is_empty]
 
 def geojson_polygon_to_pixels(coords, raster_meta):
     """

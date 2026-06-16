@@ -65,7 +65,7 @@ def create_change_detection_database(
         CREATE TABLE IF NOT EXISTS rasters (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             acquisition_date TEXT NOT NULL,
-            raster_type TEXT NOT NULL,
+            raster_name TEXT NOT NULL,
             file_path TEXT NOT NULL
         );
     """)
@@ -369,10 +369,10 @@ def sync_rasters(conn, processed_dir):
 
     to_add = tif_files - db_paths
     for path in sorted(to_add):
-        raster_type = Path(path).stem
+        raster_name = Path(path).stem
         cursor.execute(
-            "INSERT INTO rasters (acquisition_date, raster_type, file_path) VALUES (?, ?, ?)",
-            ("unknown", raster_type, path)
+            "INSERT INTO rasters (acquisition_date, raster_name, file_path) VALUES (?, ?, ?)",
+            ("unknown", raster_name, path)
         )
         print(f"Added: {path}")
 
