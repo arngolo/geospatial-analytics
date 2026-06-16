@@ -8,9 +8,17 @@ Spectral Angle Mapper (SAM) was selected as the primary change detection method.
 
 SAM measures the spectral angle between the pixel vector of the before image and the after image in spectral feature space. A larger angle indicates a greater change in spectral signature. Unlike Change Vector Analysis (CVA), SAM is insensitive to differences in pixel intensity and is only sensitive to the direction of the spectral vector. This makes it more robust to radiometric inconsistencies between acquisition dates, such as differences in atmospheric conditions or solar angle.
 
-### Why SAM
+### Algorithm comparison
 
-Both CVA and SAM were evaluated under the same preprocessing pipeline. CVA detected a larger area of change (748 ha) compared to SAM (534 ha). CVA is sensitive to pixel intensity differences as well as spectral direction, which can increase detections in areas with residual radiometric inconsistency between dates. SAM, being insensitive to intensity, is expected to be less affected by this. However, without ground truth data it is not possible to determine which method has fewer false positives. Visual inspection also showed that CVA produced detections aligned with mosaic tile boundaries — a known artifact caused by radiometric differences between adjacent tiles. Because SAM measures spectral angle rather than magnitude, it is inherently insensitive to gain differences between tiles and did not exhibit the same boundary artifacts. SAM was therefore selected for the final output based on this observed robustness, though quantitative accuracy assessment was not possible without ground truth data.
+Both CVA and SAM were evaluated under the same preprocessing pipeline. CVA detected a larger area of change (748 ha) compared to SAM (534 ha).
+
+Visual inspection revealed that the two methods are complementary rather than competing:
+
+- **CVA performed better in the pit area** (bottom-central scene). The mine pit exhibits strong spectral magnitude changes driven by excavation — exposed fresh rock, bench and ramp surfaces, water accumulation. CVA, which measures Euclidean distance in spectral space, captures these high-intensity shifts effectively and was able to resolve the spiral benching pattern of the pit.
+
+- **SAM performed better in the surrounding area** (upper scene). The mine periphery shows subtler changes — vegetation disturbance, soil exposure, burn scars — where the spectral composition shifts without a large change in brightness. SAM, measuring spectral angle rather than magnitude, is more sensitive to these direction-only changes and less affected by illumination or mosaicing differences that are more pronounced toward the scene edges.
+
+Without ground truth it is not possible to quantify which method has fewer false positives overall. The two methods are best understood as complementary — CVA for high-magnitude surface changes in the active pit, SAM for subtler spectral shifts in the surrounding area. A fusion of both probability maps would likely produce a more complete detection than either method alone.
 
 ### Preprocessing
 
