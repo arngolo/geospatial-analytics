@@ -20,6 +20,12 @@ jobs:
       - name: Install SpatiaLite extension
         run: sudo apt-get update && sudo apt-get install -y libsqlite3-mod-spatialite
 
+      - name: Resolve mod_spatialite path
+        run: |
+          MOD_SPATIALITE_PATH=$(dpkg -L libsqlite3-mod-spatialite | grep 'mod_spatialite\.so$')
+          echo "Found mod_spatialite at: $MOD_SPATIALITE_PATH"
+          echo "SPATIALITE_DLL_PATH=$MOD_SPATIALITE_PATH" >> "$GITHUB_ENV"
+
       - name: Install dependencies
         run: pip install -r requirements.txt
 
