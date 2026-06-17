@@ -1,0 +1,101 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install SpatiaLite extension
+        run: sudo apt-get update && sudo apt-get install -y libsqlite3-mod-spatialite
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # --- utils/geodatabase.py: polygon helpers ---
+
+      - name: Polygon helpers (binary_raster_to_polygons, remove_small_polygons, merge_touching_polygons)
+        run: pytest tests/test_geodatabase.py::test_polygon_helpers -v -s
+
+      # --- SpatiaLite availability ---
+
+      - name: SpatiaLite extension is available
+        run: pytest tests/test_geodatabase.py::test_spatialite_extension_is_available -v
+
+      # --- SpatiaLite database creation ---
+
+      - name: create_change_detection_database creates expected tables
+        run: pytest tests/test_geodatabase.py::test_create_change_detection_database_creates_expected_tables -v
+
+      # --- Confirm empty before insert ---
+
+      - name: Database is empty before insert
+        run: pytest tests/test_geodatabase.py::test_database_is_empty_before_insert -v
+
+      # --- Confirm has data after inserting dummy data ---
+
+      - name: Database has data after inserting dummy raster
+        run: pytest tests/test_geodatabase.py::test_database_has_data_after_inserting_dummy_raster -v
+
+      - name: Database has data after inserting dummy AOI
+        run: pytest tests/test_geodatabase.py::test_database_has_data_after_inserting_dummy_aoi -v
+
+      - name: Database has data after inserting dummy change features
+        run: pytest tests/test_geodatabase.py::test_database_has_data_after_inserting_dummy_change_features -v
+
+      # --- utils/image_pre_process.py: pre-processing functions ---
+
+      - name: Normalizer scales values to unit range
+        run: pytest tests/test_image_pre_process.py::test_normalizer_scales_values_to_unit_range -v
+
+      - name: Normalizer handles constant feature
+        run: pytest tests/test_image_pre_process.py::test_normalizer_handles_constant_feature -v
+
+      - name: threshold_change keeps only top percentile
+        run: pytest tests/test_image_pre_process.py::test_threshold_change_keeps_only_top_percentile -v
+
+      - name: otsu_threshold_change separates bimodal data
+        run: pytest tests/test_image_pre_process.py::test_otsu_threshold_change_separates_bimodal_data -v
+
+      - name: sam_change_detection no change for identical images
+        run: pytest tests/test_image_pre_process.py::test_sam_change_detection_no_change_for_identical_images -v
+
+      - name: sam_change_detection detects direction change
+        run: pytest tests/test_image_pre_process.py::test_sam_change_detection_detects_direction_change -v
+
+      - name: histogram_match preserves shape
+        run: pytest tests/test_image_pre_process.py::test_histogram_match_preserves_shape -v
+
+      - name: aoi_geojson_reader reads geojson file
+        run: pytest tests/test_image_pre_process.py::test_aoi_geojson_reader_reads_geojson_file -v
+
+      - name: clip_to_aoi keeps only intersecting polygons
+        run: pytest tests/test_image_pre_process.py::test_clip_to_aoi_keeps_only_intersecting_polygons -v
+
+      - name: geojson_polygon_to_pixels matches manual transform
+        run: pytest tests/test_image_pre_process.py::test_geojson_polygon_to_pixels_matches_manual_transform -v
+
+      - name: geojson_to_pixel_polygons skips non-polygon features
+        run: pytest tests/test_image_pre_process.py::test_geojson_to_pixel_polygons_skips_non_polygon_features -v
+
+      - name: get_bands filters xml and normalizes path separators
+        run: pytest tests/test_image_pre_process.py::test_get_bands_filters_xml_and_normalizes_path_separators -v
+
+      - name: stack_to_geotiff round trip
+        run: pytest tests/test_image_pre_process.py::test_stack_to_geotiff_round_trip -v
+
+      # --- testdata-driven insert workflow (skips until data/testdata exists) ---
+
+      - name: Full insert workflow against testdata
+        run: pytest tests/test_testdata_workflow.py::test_full_insert_workflow_against_testdata -v

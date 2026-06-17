@@ -153,6 +153,47 @@ pip install -r requirements.txt
 
 ---
 
+## Running Tests
+
+Unit tests live in `tests/` and use `pytest` (included in `requirements.txt`).
+
+From the repository root, with the virtual environment activated:
+
+```bash
+pytest
+```
+
+On Windows, if you didn't activate the venv:
+
+```powershell
+.venv\Scripts\python.exe -m pytest -v
+```
+
+To run a single test, pass its node ID (`<file>::<test_name>`), e.g.:
+
+```bash
+pytest tests/test_geodatabase.py::test_spatialite_extension_is_available -v
+```
+
+Run `pytest --collect-only -q` to list all available node IDs.
+
+Coverage includes:
+
+* Pre-processing functions (`utils/image_pre_process.py`) — normalization, thresholding, CVA/SAM change detection, histogram matching, AOI/geojson helpers, raster IO.
+* Polygon helpers (`utils/geodatabase.py`) — raster-to-polygon conversion, small-polygon removal, polygon merging. `test_polygon_helpers` runs each case and prints a `SUCCESS`/`FAILURE` line per case (use `-s` to see the output).
+* SpatiaLite availability — `test_spatialite_extension_is_available` confirms `mod_spatialite` can be loaded in the current environment. By default it looks for the QGIS 3.34.3 install path; override with the `SPATIALITE_DLL_PATH` environment variable if yours differs.
+* Database creation and insert behaviour — confirms `rasters`/`aoi`/`change_features` tables are created, the database is empty before any insert, and contains the expected rows/geometry after inserting dummy raster, AOI, and change-feature data.
+* End-to-end insert workflow against `data/testdata/{processed,aoi,change_detection_polygons}` — calls `sync_rasters`, `insert_aoi`, and `insert_change_features` in sequence and inspects the database after each step.
+  * `processed/` holds small (32x32 px) crops of the real rasters from `data/processed/`, preserving their CRS/transform/dtype.
+  * `aoi/` and `change_detection_polygons/` hold small dummy GeoJSON fixtures.
+  * If `data/testdata/` is ever removed, this test skips automatically instead of failing.
+
+### Continuous Integration
+
+`.github/workflows/tests.yml` runs each test as its own step on `ubuntu-latest`, installing `mod_spatialite` via `apt` (`libsqlite3-mod-spatialite`) before the suite runs.
+
+---
+
 ## Processed Outputs
 
 Files written to `data/processed/` during the workflow:
