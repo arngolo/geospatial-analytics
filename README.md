@@ -26,6 +26,13 @@ The workflow:
 ├── data/
 │   ├── processed/
 │   ├── change_database.sqlite
+│   ├── change_detection/
+│   │   ├── change_detection.qgz      # QGIS project served by qgis-server
+│   │   ├── packaged_data.gpkg        # GeoPackage with rasters/vectors bundled for the project
+│   │   └── rasters/
+│   ├── qgis_wms_leaflet-client/
+│   │   ├── leaflet.html              # Leaflet client consuming the WMS layers
+│   │   └── Dockerfile                # nginx image serving leaflet.html
 │   └── ...
 ├── debug_geodatabase.ipynb
 ├── debug_notebook.ipynb
@@ -33,6 +40,7 @@ The workflow:
 │   ├── geodatabase.py
 │   ├── image_pre_process.py
 │   └── ...
+├── docker-compose.yml
 ├── report.md
 ├── README.md
 └── requirements.txt
@@ -199,4 +207,47 @@ Continuing in `debug_notebook.ipynb`, the workflow:
 * Removes small polygons.
 * Merges adjacent detections.
 * Inserts geometries into the SpatiaLite database.
+
+---
+
+## Viewing Results in QGIS Server + Leaflet (Docker)
+
+The change detection outputs are also packaged as a QGIS project (`data/change_detection/change_detection.qgz` plus `packaged_data.gpkg`) so they can be served over WMS by `qgis-server` and viewed in a browser through a small Leaflet client.
+
+### 1. Start the services
+
+From the repository root:
+
+```bash
+docker compose up -d
+```
+
+This starts two containers, defined in `docker-compose.yml`:
+
+* **qgis-server** — serves the QGIS project at `data/change_detection/` over WMS, exposed on `http://localhost:8080`.
+* **frontend** — an nginx container serving the Leaflet client from `data/qgis_wms_leaflet-client/`, exposed on `http://localhost:8000`.
+
+### 2. Open the client
+
+Open `http://localhost:8000/leaflet.html` in a browser.
+
+The map loads an OpenStreetMap basemap plus the following WMS layers (toggle via the layers control):
+
+* `sentinel2_20230812_RGB` — before-image RGB composite
+* `geotiff_hist_match` — after-image, histogram matched
+* `change_features` — detected change polygons
+* `binary_cd_auto_otsu_cva` — CVA binary change mask
+* `binary_cd_threshold_98_sam` — SAM binary change mask
+
+### 3. Inspect the WMS service directly (optional)
+
+```text
+http://localhost:8080/ows/?MAP=/io/data/change_detection.qgz&SERVICE=WMS&REQUEST=GetCapabilities
+```
+
+### 4. Stop the services
+
+```bash
+docker compose down
+```
 

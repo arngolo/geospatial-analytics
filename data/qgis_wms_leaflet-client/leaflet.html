@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Leaflet + WMS</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <!-- Leaflet CSS -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+    }
+
+    #map {
+      width: 100%;
+      height: 100%;
+    }
+
+    .info-box {
+      position: absolute;
+      top: 10px;
+      left: 50px;
+      z-index: 1000;
+      background: white;
+      padding: 8px 10px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font: 14px/1.4 Arial, sans-serif;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+    }
+  </style>
+</head>
+<body>
+  <div class="info-box">
+    Leaflet WMS test
+  </div>
+  <div id="map"></div>
+
+  <!-- Leaflet JS -->
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+
+  <script>
+const map = L.map('map', {
+  center: [-12.23, 25.82],
+  zoom: 12
+});
+
+// Always visible
+L.tileLayer(
+  'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+  {
+    maxZoom: 19,
+    attribution: '&copy; OpenStreetMap contributors'
+  }
+).addTo(map);
+
+const wmsUrl =
+  'http://localhost:8080/ows/?MAP=/io/data/change_detection.qgz';
+
+const rgb = L.tileLayer.wms(wmsUrl, {
+  layers: 'sentinel2_20230812_RGB',
+  format: 'image/png',
+  transparent: true
+}).addTo(map);
+
+const histMatch = L.tileLayer.wms(wmsUrl, {
+  layers: 'geotiff_hist_match',
+  format: 'image/png',
+  transparent: true
+});
+
+const changeFeatures = L.tileLayer.wms(wmsUrl, {
+  layers: 'change_features',
+  format: 'image/png',
+  transparent: true
+}).addTo(map);
+
+const cva = L.tileLayer.wms(wmsUrl, {
+  layers: 'binary_cd_auto_otsu_cva',
+  format: 'image/png',
+  transparent: true
+});
+
+const sam = L.tileLayer.wms(wmsUrl, {
+  layers: 'binary_cd_threshold_98_sam',
+  format: 'image/png',
+  transparent: true
+});
+
+L.control.layers(
+  null, // no base layers
+  {
+    "RGB Image": rgb,
+    "Histogram Matched": histMatch,
+    "Change Features": changeFeatures,
+    "CVA Change Mask": cva,
+    "SAM Change Mask": sam
+  }
+).addTo(map);
+  </script>
+</body>
+</html>
