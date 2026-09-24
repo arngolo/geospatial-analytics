@@ -1,0 +1,23 @@
+{
+    "type": "FeatureCollection",
+    "features": [
+        {
+            "type": "Feature",
+            "geometry": {
+                "type": "Polygon",
+                "coordinates": [
+                    [
+                        [25.80, -12.30],
+                        [25.81, -12.30],
+                        [25.81, -12.29],
+                        [25.80, -12.29],
+                        [25.80, -12.30]
+                    ]
+                ]
+            },
+            "properties": {
+                "name": "dummy_test_aoi"
+            }
+        }
+    ]
+}

@@ -10,3 +10,4 @@ natsort
 pyproj
 scikit-image
 shapely
+pytest

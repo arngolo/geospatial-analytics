@@ -26,6 +26,13 @@ The workflow:
 ├── data/
 │   ├── processed/
 │   ├── change_database.sqlite
+│   ├── change_detection/
+│   │   ├── change_detection.qgz      # QGIS project served by qgis-server
+│   │   ├── packaged_data.gpkg        # GeoPackage with rasters/vectors bundled for the project
+│   │   └── rasters/
+│   ├── qgis_wms_leaflet-client/
+│   │   ├── leaflet.html              # Leaflet client consuming the WMS layers
+│   │   └── Dockerfile                # nginx image serving leaflet.html
 │   └── ...
 ├── debug_geodatabase.ipynb
 ├── debug_notebook.ipynb
@@ -33,6 +40,7 @@ The workflow:
 │   ├── geodatabase.py
 │   ├── image_pre_process.py
 │   └── ...
+├── docker-compose.yml
 ├── report.md
 ├── README.md
 └── requirements.txt
@@ -145,6 +153,47 @@ pip install -r requirements.txt
 
 ---
 
+## Running Tests
+
+Unit tests live in `tests/` and use `pytest` (included in `requirements.txt`).
+
+From the repository root, with the virtual environment activated:
+
+```bash
+pytest
+```
+
+On Windows, if you didn't activate the venv:
+
+```powershell
+.venv\Scripts\python.exe -m pytest -v
+```
+
+To run a single test, pass its node ID (`<file>::<test_name>`), e.g.:
+
+```bash
+pytest tests/test_geodatabase.py::test_spatialite_extension_is_available -v
+```
+
+Run `pytest --collect-only -q` to list all available node IDs.
+
+Coverage includes:
+
+* Pre-processing functions (`utils/image_pre_process.py`) — normalization, thresholding, CVA/SAM change detection, histogram matching, AOI/geojson helpers, raster IO.
+* Polygon helpers (`utils/geodatabase.py`) — raster-to-polygon conversion, small-polygon removal, polygon merging. `test_polygon_helpers` runs each case and prints a `SUCCESS`/`FAILURE` line per case (use `-s` to see the output).
+* SpatiaLite availability — `test_spatialite_extension_is_available` confirms `mod_spatialite` can be loaded in the current environment. By default it looks for the QGIS 3.34.3 install path; override with the `SPATIALITE_DLL_PATH` environment variable if yours differs.
+* Database creation and insert behaviour — confirms `rasters`/`aoi`/`change_features` tables are created, the database is empty before any insert, and contains the expected rows/geometry after inserting dummy raster, AOI, and change-feature data.
+* End-to-end insert workflow against `data/testdata/{processed,aoi,change_detection_polygons}` — calls `sync_rasters`, `insert_aoi`, and `insert_change_features` in sequence and inspects the database after each step.
+  * `processed/` holds small (32x32 px) crops of the real rasters from `data/processed/`, preserving their CRS/transform/dtype.
+  * `aoi/` and `change_detection_polygons/` hold small dummy GeoJSON fixtures.
+  * If `data/testdata/` is ever removed, this test skips automatically instead of failing.
+
+### Continuous Integration
+
+`.github/workflows/tests.yml` runs each test as its own step on `ubuntu-latest`, installing `mod_spatialite` via `apt` (`libsqlite3-mod-spatialite`) before the suite runs.
+
+---
+
 ## Processed Outputs
 
 Files written to `data/processed/` during the workflow:
@@ -199,4 +248,47 @@ Continuing in `debug_notebook.ipynb`, the workflow:
 * Removes small polygons.
 * Merges adjacent detections.
 * Inserts geometries into the SpatiaLite database.
+
+---
+
+## Viewing Results in QGIS Server + Leaflet (Docker)
+
+The change detection outputs are also packaged as a QGIS project (`data/change_detection/change_detection.qgz` plus `packaged_data.gpkg`) so they can be served over WMS by `qgis-server` and viewed in a browser through a small Leaflet client.
+
+### 1. Start the services
+
+From the repository root:
+
+```bash
+docker compose up -d
+```
+
+This starts two containers, defined in `docker-compose.yml`:
+
+* **qgis-server** — serves the QGIS project at `data/change_detection/` over WMS, exposed on `http://localhost:8080`.
+* **frontend** — an nginx container serving the Leaflet client from `data/qgis_wms_leaflet-client/`, exposed on `http://localhost:8000`.
+
+### 2. Open the client
+
+Open `http://localhost:8000/leaflet.html` in a browser.
+
+The map loads an OpenStreetMap basemap plus the following WMS layers (toggle via the layers control):
+
+* `sentinel2_20230812_RGB` — before-image RGB composite
+* `geotiff_hist_match` — after-image, histogram matched
+* `change_features` — detected change polygons
+* `binary_cd_auto_otsu_cva` — CVA binary change mask
+* `binary_cd_threshold_98_sam` — SAM binary change mask
+
+### 3. Inspect the WMS service directly (optional)
+
+```text
+http://localhost:8080/ows/?MAP=/io/data/change_detection.qgz&SERVICE=WMS&REQUEST=GetCapabilities
+```
+
+### 4. Stop the services
+
+```bash
+docker compose down
+```
 

@@ -291,11 +291,12 @@ def connect_spatialite_database(
 
     conn.enable_load_extension(True)
 
-    os.add_dll_directory(
-        os.path.dirname(
-            spatialite_dll_path
+    if hasattr(os, "add_dll_directory"):
+        os.add_dll_directory(
+            os.path.dirname(
+                spatialite_dll_path
+            )
         )
-    )
 
     conn.load_extension(
         spatialite_dll_path
@@ -316,7 +317,8 @@ def inspect_database(database_path, spatialite_dll_path, limit=10):
         "KNN", "KNN2",
     }
 
-    os.add_dll_directory(os.path.dirname(spatialite_dll_path))
+    if hasattr(os, "add_dll_directory"):
+        os.add_dll_directory(os.path.dirname(spatialite_dll_path))
     conn = sqlite3.connect(database_path)
     conn.enable_load_extension(True)
     conn.load_extension(spatialite_dll_path)
@@ -385,7 +387,8 @@ def sync_rasters(conn, processed_dir):
     print(f"\nSync complete — added {len(to_add)}, removed {len(to_remove)}")
 
 def delete_records(database_path, spatialite_dll_path, table, id=None, where=None, remove_all=False):
-    os.add_dll_directory(os.path.dirname(spatialite_dll_path))
+    if hasattr(os, "add_dll_directory"):
+        os.add_dll_directory(os.path.dirname(spatialite_dll_path))
     conn = sqlite3.connect(database_path)
     conn.enable_load_extension(True)
     conn.load_extension(spatialite_dll_path)

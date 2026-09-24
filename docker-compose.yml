@@ -1,0 +1,23 @@
+version: "3.9"
+
+services:
+
+  qgis-server:
+    image: qgis/qgis-server
+    container_name: qgis-server
+
+    ports:
+      - "8080:80"
+
+    volumes:
+      - ./data/change_detection:/io/data
+
+  frontend:
+    build: ./data/qgis_wms_leaflet-client
+    container_name: webapp
+
+    ports:
+      - "8000:80"
+
+    depends_on:
+      - qgis-server
